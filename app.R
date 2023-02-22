@@ -130,7 +130,7 @@ server <- function(input, output, session) {
   observe({
     if (is.null(strResult())) return()
     isolate({
-      smplNames <<- c("", unique(strResult()$smpl))
+      smplNames <- c("", unique(strResult()$smpl))
       updateSelectInput(session, "dadID",
                         choices = smplNames)
       updateSelectInput(session, "momID",
