@@ -47,7 +47,7 @@ ui <- fluidPage(
                            h3("RAW Result"),
                            verbatimTextOutput("rawResultTxt")),
                   # tabPanel("Input Table", 
-                           # tableOutput("inputTbl")
+                  # tableOutput("inputTbl")
                   # ),
                   tabPanel("Loci Table",
                            verbatimTextOutput("lociDataOutput"))
@@ -103,8 +103,8 @@ server <- function(input, output, session) {
     strResult %>%
       pivot_longer(cols = c("allele1", "allele2"), names_to = NULL,
                    values_to = "allele") %>%
-      mutate(allele = str_extract(allele, "[0-9]+\\.?[1-9]?+")) %>% 
-      filter(marker != "AMEL") %>% 
+      mutate(allele = str_extract(allele, "[0-9XY]+\\.?[1-9]?+")) %>% 
+      # filter(marker != "AMEL") %>% 
       group_by(marker) %>% 
       mutate(excludeUnknownAllele = !(allele %in% names(lociData()[[marker[1]]])),
              excludeMarker = any(excludeUnknownAllele))
@@ -114,7 +114,7 @@ server <- function(input, output, session) {
   output$excludedAlleles <- renderTable({
     if (is.null(strResult())) return()
     strResult() %>% 
-      filter(excludeUnknownAllele) %>% 
+      filter(excludeUnknownAllele & marker != "AMEL") %>% 
       select(-c(excludeUnknownAllele, excludeMarker))
   })
   
@@ -137,15 +137,30 @@ server <- function(input, output, session) {
                         choices = smplNames)
       updateSelectInput(session, "childID",
                         choices = smplNames)
-      if (length(smplNames) > 2) {
+      if (length(smplNames) == 3) {
         updateSelectInput(session, "dadID", 
                           selected = smplNames[2])
         updateSelectInput(session, "childID", 
                           selected = smplNames[3])
       }
-      if (length(smplNames) > 3) {
-        updateSelectInput(session, "momID", 
-                          selected = smplNames[4])
+      else if (length(smplNames) == 4) {
+        updateSelectInput(session, "dadID", 
+                          selected = smplNames[2])
+        if ("AMEL" %in% strResult()$marker && 
+            "Y" %in% (strResult() %>% 
+                      filter(smpl == smplNames[3] & marker == "AMEL") %>% 
+                      pull(allele))
+        ) { 
+          updateSelectInput(session, "momID", 
+                            selected = smplNames[4])
+          updateSelectInput(session, "childID", 
+                            selected = smplNames[3])
+        } else {
+          updateSelectInput(session, "momID", 
+                            selected = smplNames[3])
+          updateSelectInput(session, "childID", 
+                            selected = smplNames[4])
+        }
       }
     })
   })
@@ -214,9 +229,9 @@ server <- function(input, output, session) {
         persons else persons[-3]
     
     # result <<-
-      FamiliasPosterior(pedigrees, 
-                        loci
-                        , datamatrix)
+    FamiliasPosterior(pedigrees, 
+                      loci
+                      , datamatrix)
     
     # result
   })
