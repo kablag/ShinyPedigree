@@ -108,6 +108,7 @@ server <- function(input, output, session) {
       group_by(marker) %>% 
       mutate(excludeUnknownAllele = !(allele %in% names(lociData()[[marker[1]]])),
              excludeMarker = any(excludeUnknownAllele))
+    
   })
   
   output$excludedAlleles <- renderTable({
@@ -129,13 +130,23 @@ server <- function(input, output, session) {
   observe({
     if (is.null(strResult())) return()
     isolate({
-      smplNames <- c("", unique(strResult()$smpl))
+      smplNames <<- c("", unique(strResult()$smpl))
       updateSelectInput(session, "dadID",
                         choices = smplNames)
       updateSelectInput(session, "momID",
                         choices = smplNames)
       updateSelectInput(session, "childID",
                         choices = smplNames)
+      if (length(smplNames) > 2) {
+        updateSelectInput(session, "dadID", 
+                          selected = smplNames[2])
+        updateSelectInput(session, "childID", 
+                          selected = smplNames[3])
+      }
+      if (length(smplNames) > 3) {
+        updateSelectInput(session, "momID", 
+                          selected = smplNames[4])
+      }
     })
   })
   
