@@ -26,9 +26,23 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       fileInput("strResultFile", "STR results"),
-      selectInput("dadID", "Father", ""),
-      selectInput("momID", "Mother", ""),
-      selectInput("childID", "Child", ""),
+      wellPanel(
+        selectInput("dadID", "Father ID", ""),
+        textInput("dadName", "Father Name"),
+        textInput("dadBirthDate", "Father Birth Date")
+      ),
+      wellPanel(
+        selectInput("momID", "Mother ID", ""),
+        textInput("momName", "Mother Name"),
+        textInput("momBirhtDate", "Mother Birth Date")
+      ),
+      wellPanel(
+        selectInput("childID", "Child ID", ""),
+        textInput("childName", "Child Name"),
+        textInput("childBirthDate", "Child Birth Date")
+      ),
+      numericInput("priorProb", "Is Father Prior", 
+                   0.5, 0, 1),
       tableOutput("inputTbl")
       # ,
       # checkboxInput("passUnknownAlleles",
@@ -188,16 +202,17 @@ server <- function(input, output, session) {
       select(-c(excludeUnknownAllele, excludeMarker))
     # strResult <- strResult %>% 
     #   select(-excludeUnknownAllele)
+    momExists <- input$momID != ""
     persons <- c(input$childID, input$dadID, 
                  {
-                   if (input$momID != "") 
+                   if (momExists) 
                      input$momID else "unkn"
                  })
     sex <- c("male", "male", "female")
     ped1 <- FamiliasPedigree(id = persons, dadid = c(NA, NA, NA),
                              momid = c(
                                {
-                                 if (input$momID != "") 
+                                 if (momExists) 
                                    input$momID else NA
                                }, 
                                NA, NA), 
@@ -205,7 +220,7 @@ server <- function(input, output, session) {
     ped2 <- FamiliasPedigree(id = persons, dadid = c(input$dadID, NA, NA),
                              momid = c(
                                {
-                                 if (input$momID != "") 
+                                 if (momExists) 
                                    input$momID else NA
                                },
                                NA, NA), 
@@ -218,20 +233,22 @@ server <- function(input, output, session) {
     p2 <- strResult %>% 
       filter(smpl == input$dadID) %>% 
       pull(allele)
-    p3 <- if (input$momID != "") {
+    p3 <- if (momExists) {
       strResult %>% 
         filter(smpl == input$momID) %>% 
         pull(allele) 
     } else NULL
     datamatrix <- rbind(p1, p2, p3)
     rownames(datamatrix) <- 
-      if (input$momID != "") 
+      if (momExists) 
         persons else persons[-3]
     
     # result <<-
     FamiliasPosterior(pedigrees, 
-                      loci
-                      , datamatrix)
+                      loci,
+                      datamatrix,
+                      c(1 - input$priorProb,
+                        input$priorProb))
     
     # result
   })
@@ -239,13 +256,18 @@ server <- function(input, output, session) {
   
   
   output$resultTxt <- renderUI({
-    if (is.null(resultRelationship())) return()
+    if (is.null(resultRelationship)) return()
     LR <- as.numeric(resultRelationship()$LR["isFather"])
-    calcr <- mpfr((LR / (LR + 1)) * 100, 64)
-    sprintf("<b>Probability of paternity: %s %%<br>
-            Likelihood Ratio (LR): %s</b>", 
-            format(calcr , digits = NULL),
-            LR) %>% 
+    posterior <- resultRelationship()$likelihoods * 
+      c(1 - input$priorProb,
+        input$priorProb)
+    calcr <- mpfr(posterior["isFather"] / sum(posterior) * 100, 64)
+    sprintf("<b>Likelihood Ratio (LR): %s<br>
+    Is Father Prior Probability: %s<br>
+    Probability of paternity: %s %%</b>",
+            LR,
+            input$priorProb,
+            format(calcr , digits = NULL)) %>% 
       HTML()
   })
   
